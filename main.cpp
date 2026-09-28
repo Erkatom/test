@@ -23,8 +23,8 @@ int main()
                 return 1;
         }
         transpose(mtx);
-        for (size_t i=0;i<m*n;++i) 
-        { 
+        for (size_t i=0;i<m*n;++i)
+        {
                 std::cout << mtx[i/m][i%m];
         }
         rmMtx(mtx,m);
