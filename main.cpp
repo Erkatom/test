@@ -1,5 +1,7 @@
 #include <iostream>
 
+// haha
+
 int makeMtx(int mtx, size_t m, size_t n);
 void transpose(int** mtx);
 void rmMtx(int** mtx, size_t m);
