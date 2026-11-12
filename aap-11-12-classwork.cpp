@@ -3,7 +3,6 @@
 #include <cstddef>
 #include <limits>
 #include <stdexcept>
-#include <algorithm>
 
 struct p_t
 {
@@ -19,18 +18,18 @@ public:
   Ints(const Ints & rhs);
   Ints(Ints && rhs) noexcept;
   Ints & operator=(const Ints & rhs);
-  Ints & operator=(Ints && rhs) noexcept;
+  Ints & operator=(Ints && rhs);
   Ints operator+(const Ints & rhs) const;
   ~Ints();
 
   size_t getSize() const noexcept;
-  void set(size_t id, int i);
-  int get(size_t id) const;
+  void set(size_t id, int i) noexcept;
+  int get(size_t id) const noexcept;
   void setSafe(size_t id, int i);
   int getSafe(size_t id) const;
 
-  Ints append(int i) const;
-  Ints append(const Ints & b) const;
+  Ints append(int i);
+  Ints append(Ints b);
 
   static Ints unitializatedInts(size_t size);
 
@@ -50,27 +49,28 @@ Ints::Ints():
 Ints::Ints(size_t size, int value):
   capacity_(size),
   size_(size),
-  data_(size > 0 ? new int[size] : nullptr)
+  data_(new int [size])
 {
-  for (size_t i = 0; i < size_; ++i)
+  for (size_t i = 0; i < size_, ++i)
   {
     data_[i] = value;
   }
 }
 
-Ints Ints::unitializatedInts(size_t size)
+static Ints Ints::unitializatedInts(size_t size)
 {
   Ints temp;
   temp.size_ = 0;
   temp.capacity_ = size;
-  temp.data_ = size > 0 ? new int[size] : nullptr;
+  temp.data_ = new int [size_];
+
   return temp;
 }
 
 Ints::Ints(const Ints & rhs):
   capacity_(rhs.capacity_),
   size_(rhs.size_),
-  data_(rhs.capacity_ > 0 ? new int[rhs.capacity_] : nullptr)
+  data_(new int [size_])
 {
   for (size_t i = 0; i < size_; ++i)
   {
@@ -94,10 +94,12 @@ Ints & Ints::operator=(const Ints & rhs)
   {
     return *this;
   }
+
   Ints temp(rhs);
-  std::swap(capacity_, temp.capacity_);
-  std::swap(size_, temp.size_);
-  std::swap(data_, temp.data_);
+
+  std::swap(size_, temp.size)
+  std::swap(data_, temp.data)
+
   return *this;
 }
 
@@ -105,7 +107,8 @@ Ints & Ints::operator=(Ints && rhs) noexcept
 {
   if (this != &rhs)
   {
-    delete[] data_;
+    delete [] data_;
+
     capacity_ = rhs.capacity_;
     size_ = rhs.size_;
     data_ = rhs.data_;
@@ -113,7 +116,9 @@ Ints & Ints::operator=(Ints && rhs) noexcept
     rhs.data_ = nullptr;
     rhs.size_ = 0;
     rhs.capacity_ = 0;
+
   }
+
   return *this;
 }
 
@@ -121,25 +126,27 @@ Ints Ints::operator+(const Ints & rhs) const
 {
   if (getSize() != rhs.getSize())
   {
-    throw std::invalid_argument("Массивы имеют разный размер");
+    throw std::invalid_argument("Arrays have different size");
   }
 
-  Ints result(getSize(), 0);
+  Ints result(getSize(), 0)
   for (size_t i = 0; i < getSize(); ++i)
   {
-    if ((rhs.get(i) > 0 && get(i) > std::numeric_limits<int>::max() - rhs.get(i)) ||
-        (rhs.get(i) < 0 && get(i) < std::numeric_limits<int>::min() - rhs.get(i)))
-    {
-      throw std::overflow_error("Переполнение");
-    }
+    if (rhs.get(i) > std::numeric_limits< int >::max() - get(i)
+        || rhs.get(i) < std::numeric_limits< int >::min() + get(i))
+      {
+        throw std::invalid_argument("overflow");
+      }
+
     result.set(i, rhs.get(i) + get(i));
   }
+
   return result;
 }
 
 Ints::~Ints()
 {
-  delete[] data_;
+  delete [] data_;
 }
 
 size_t Ints::getSize() const noexcept
@@ -152,32 +159,50 @@ void Ints::set(size_t id, int i)
   data_[id] = i;
 }
 
-int Ints::get(size_t id) const
+int Ints::get(size_t id) noexcept const
 {
   return data_[id];
 }
 
 void Ints::setSafe(size_t id, int i)
 {
-  if (id >= size_)
+  if (id > size_)
   {
-    throw std::out_of_range("Недопустимый индекс");
+    throw std::logic_error("Invalid value");
   }
+
   set(id, i);
 }
 
 int Ints::getSafe(size_t id) const
 {
-  if (id >= size_)
+  if (id > size_)
   {
-    throw std::out_of_range("Недопустимый индекс");
+    throw std::logic_error("Invalid value");
   }
+
   return get(id);
+}
+
+
+Ints Ints::append(int i)
+{
+  Ints result(*this);
+
+  if (result.capacity_ < result.size_ + 1)
+  {
+    result.resize();
+  }
+
+  result.data_[size_] = i;
+  ++result.size_;
+
+  return result;
 }
 
 void Ints::resize()
 {
-  size_t new_cap = (capacity_ == 0) ? 2 : capacity_ * 2;
+  size_t new_cap = capacity_ == 0 ? 2 : capacity_ * 2;
   int * new_data = new int[new_cap];
   for (size_t i = 0; i < size_; ++i)
   {
@@ -188,19 +213,7 @@ void Ints::resize()
   capacity_ = new_cap;
 }
 
-Ints Ints::append(int i) const
-{
-  Ints result(*this);
-  if (result.capacity_ < result.size_ + 1)
-  {
-    result.resize();
-  }
-  result.data_[result.size_] = i;
-  ++result.size_;
-  return result;
-}
-
-Ints Ints::append(const Ints & b) const
+Ints Ints::append(Ints b)
 {
   Ints result(*this);
   for (size_t i = 0; i < b.getSize(); ++i)
@@ -214,28 +227,27 @@ class Points
 {
 public:
   void set(size_t id, p_t p);
-  p_t get(size_t id) const;
-  Points append(p_t p) const;
-  size_t getCount() const noexcept { return data_.getSize() / 2; }
+  int get(size_t id);
+  Points append(p_t p);
 private:
-  Ints data_;
+  Ints data;
 };
 
 void Points::set(size_t id, p_t p)
 {
-  data_.setSafe(id * 2, p.x);
-  data_.setSafe(id * 2 + 1, p.y);
+  data.set(id * 2, p.x);
+  data.set(id * 2 + 1, p.y);
 }
 
-p_t Points::get(size_t id) const
+int Points::get(size_t id)
 {
-  return {data_.getSafe(id * 2), data_.getSafe(id * 2 + 1)};
+  return data.get(id);
 }
 
-Points Points::append(p_t p) const
+Points Points::append(p_t p)
 {
   Points res(*this);
-  res.data_ = res.data_.append(p.x).append(p.y);
+  res.data = res.data.append(p.x).append(p.y);
   return res;
 }
 
@@ -243,27 +255,34 @@ class Plot
 {
 public:
   void set(int x, int y);
-  int calc(int x) const;
-  size_t solve(Ints & buf, int y) const;
-  Points append(p_t p) const;
+  int calc(int x);
+  size_t solve(Ints & buf, int y);
+  Points append(p_t p);
 private:
   Ints data_;
 };
 
-void Plot::set(int x, int y)
+size_t Plot::solve(Ints & buf, int y)
 {
-  for (size_t i = 0; i < data_.getSize(); i += 2)
+  size_t cnt = 0;
+  for (size_t i = 1; i < data_.getSize(); i+=2)
   {
-    if (data_.get(i) == x)
+    if (y == data_.get(i))
     {
-      data_.set(i + 1, y);
-      return;
+      buf.append(data_.get(i - 1));
+      ++cnt;
     }
   }
+
+  return cnt;
+}
+
+void Plot::set(int x, int y)
+{
   data_ = data_.append(x).append(y);
 }
 
-int Plot::calc(int x) const
+int Plot::calc(int x)
 {
   for (size_t i = 0; i < data_.getSize(); i += 2)
   {
@@ -272,32 +291,18 @@ int Plot::calc(int x) const
       return data_.get(i + 1);
     }
   }
-  throw std::logic_error("Координата X не найдена на графике");
+  return 0;
 }
 
-size_t Plot::solve(Ints & buf, int y) const
+Points Plot::append(p_t p)
 {
-  size_t cnt = 0;
-  for (size_t i = 1; i < data_.getSize(); i += 2)
-  {
-    if (y == data_.get(i))
-    {
-      buf = buf.append(data_.get(i - 1));
-      ++cnt;
-    }
-  }
-  return cnt;
-}
-
-Points Plot::append(p_t p) const
-{
-  Points pts;
+  Points res;
   for (size_t i = 0; i < data_.getSize(); i += 2)
   {
-    pts = pts.append({data_.get(i), data_.get(i + 1)});
+    res = res.append({data_.get(i), data_.get(i + 1)});
   }
-  pts = pts.append(p);
-  return pts;
+  res = res.append(p);
+  return res;
 }
 
 class Mtx
@@ -306,19 +311,9 @@ public:
   Mtx();
   Mtx(size_t m, size_t n);
   ~Mtx() = default;
-
-  void set(size_t r, size_t c, int val) { data.setSafe(r * n + c, val); }
-  int get(size_t r, size_t c) const { return data.getSafe(r * n + c); }
-
   Mtx sum(const Mtx & oth) const;
-  Mtx mul(const Mtx & oth) const;
-  Mtx transpose() const;
-  Mtx add_row(int init) const;
-  Ints getCol(size_t id) const;
-  Ints getRow(size_t id) const;
-
-  void print() const;
-
+  Ints getCol(size_t id);
+  Ints getRow(size_t id);
 private:
   size_t m;
   size_t n;
@@ -328,149 +323,108 @@ private:
 Mtx::Mtx():
   m(0),
   n(0),
-  data()
 {}
 
 Mtx::Mtx(size_t m, size_t n):
   m(m),
   n(n),
-  data(m * n, 0)
 {
-  if (n != 0 && m > std::numeric_limits<size_t>::max() / n)
+  if (m > std::numeric_limits< size_t >::max() / n)
   {
-    throw std::logic_error("Переполнение при создании матрицы");
+    throw std::logic_error("Owerflow");
   }
+
+  data(n * m, 0);
 }
 
 Mtx Mtx::sum(const Mtx & oth) const
 {
-  if (m != oth.m || n != oth.n)
-  {
-    throw std::invalid_argument("Матрицы имеют разные размеры");
-  }
   Mtx res(m, n);
-  res.data = data + oth.data;
+  for (size_t i = 0; i < data.getSize(); ++i)
+  {
+    if (oth.data.get(i) > std::numeric_limits< size_t >::max() - data.get(i))
+    {
+      throw std::logic_error("Owerflow");
+    }
+
+    res.data.set(i, oth.data.get(i) + data.get(i));
+  }
+
   return res;
 }
 
-Ints Mtx::getCol(size_t id) const
+Ints Mtx::getCol(size_t id)
 {
-  if (id >= n) throw std::out_of_range("Индекс столбца вне диапазона");
-  Ints res;
+  Ints res(m, 0);
   for (size_t i = 0; i < m; ++i)
   {
-    res = res.append(data.get(i * n + id));
+    res.append(i * n + id);
   }
+
   return res;
 }
 
-Ints Mtx::getRow(size_t id) const
+Ints Mtx::getRow(size_t id)
 {
-  if (id >= m) throw std::out_of_range("Индекс строки вне диапазона");
-  Ints res;
+  Ints res(n, 0);
   for (size_t i = 0; i < n; ++i)
   {
-    res = res.append(data.get(id * n + i));
+    res.append(id * m + i);
   }
+
   return res;
 }
 
-Mtx Mtx::mul(const Mtx & oth) const
+Mtx Mtx::mul(const Mtx & oth) const;
 {
-  if (n != oth.m)
-  {
-    throw std::invalid_argument("Несовместимые размеры матриц для умножения");
-  }
+  //mn np = mp
+  //m1n1 m2n2 = m1n2
   Mtx res(m, oth.n);
+  int sm = 0;
   for (size_t i = 0; i < m; ++i)
   {
-    Ints row = getRow(i);
     for (size_t j = 0; j < oth.n; ++j)
     {
+      Ints row = getRow(i);
       Ints col = oth.getCol(j);
-      int sm = 0;
-      for (size_t z = 0; z < n; ++z)
+
+      sm = 0;
+      for (size_t z = 0; z < m; z++)
       {
-        sm += row.get(z) * col.get(z);
+        sm += row[z] * col[z]
       }
-      res.data.set(i * oth.n + j, sm);
+
+      res.data.set(i * n + j, sm);
     }
   }
-  return res;
-}
 
-Mtx Mtx::transpose() const
-{
-  Mtx res(n, m);
-  for (size_t i = 0; i < m; ++i)
-  {
-    for (size_t j = 0; j < n; ++j)
-    {
-      res.set(j, i, get(i, j));
-    }
-  }
   return res;
-}
-
-Mtx Mtx::add_row(int init) const
-{
-  Mtx res(m + 1, n);
-  Ints new_row(n, init);
-  res.data = data.append(new_row);
-  return res;
-}
-
-void Mtx::print() const
-{
-  for (size_t i = 0; i < m; ++i)
-  {
-    for (size_t j = 0; j < n; ++j)
-    {
-      std::cout << get(i, j) << "\t";
-    }
-    std::cout << "\n";
-  }
 }
 
 int main()
 {
   try
   {
-    std::cout << "--- Тест массива чисел ---\n";
-    Ints a(5, 10);
-    Ints b(5, 20);
+    std::cout << "Запуск программы Занятие 2_11\n";
+    Ints a(10, 67);
+    Ints b(10, 69);
     Ints c = a + b;
-    std::cout << "Результат сложения первого элемента: " << c.get(0) << "\n\n";
+    std::cout << "Первый элемент суммы массивов: " << c.get(0) << "\n";
 
-    std::cout << "--- Тест матриц ---\n";
-    Mtx m1(2, 3);
-    m1.set(0, 0, 1); m1.set(0, 1, 2); m1.set(0, 2, 3);
-    m1.set(1, 0, 4); m1.set(1, 1, 5); m1.set(1, 2, 6);
+    Mtx m1(2, 2);
+    Mtx m2(2, 2);
+    Mtx m3 = m1.sum(m2);
+    std::cout << "Сложение матриц выполнено\n";
 
-    Mtx m2 = m1.transpose();
-    Mtx m3 = m1.mul(m2);
-    std::cout << "Результат умножения исходной матрицы на транспонированную:\n";
-    m3.print();
-
-    std::cout << "\n--- Тест графика ---\n";
     Plot p;
-    p.set(1, 100);
-    p.set(2, 200);
-    p.set(3, 100);
-    
+    p.set(1, 5);
     Ints roots;
-    size_t count = p.solve(roots, 100);
-    std::cout << "Найдено корней для значения 100: " << count << " (координаты: ";
-    for (size_t i = 0; i < roots.getSize(); ++i)
-    {
-      std::cout << roots.get(i) << (i + 1 < roots.getSize() ? ", " : "");
-    }
-    std::cout << ")\n";
+    size_t cnt = p.solve(roots, 5);
+    std::cout << "Найдено корней на графике: " << cnt << "\n";
   }
   catch (const std::exception & e)
   {
-    std::cerr << "Ошибка: " << e.what() << "\n";
-    return 1;
+    std::cout << "Произошла ошибка: " << e.what() << "\n";
   }
   return 0;
 }
